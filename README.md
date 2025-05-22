@@ -1,5 +1,7 @@
 # From Caves To Cars
 
+Hello world!
+
 This is an experiment I'm doing to really understand how well OpenAI works at complex tasks.  I also don't have much direct experience with Github Actions, CI/CD pipeline deployments, Flask/Jinja2, Web frontends (CSS/Javascript), etc. and this is a chance for me to get some hands-on experience.
 
 **I am asserting strongly that what I've doing here is neither secure, nor a recommended way to do things!**   What I'm trying to do is push OpenAI automation as far as possible into all aspects of a simple software project.  In a perfect world, eventually OpenAI would completely run this project in a fully automated way.  Of course, I don't expect that to be feasible, so I'm using this project to understand how and where it falls apart.
