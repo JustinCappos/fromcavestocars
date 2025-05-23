@@ -168,6 +168,16 @@
     .toast.hidden {
       display: none;
     }
+
+    /* Version display in the bottom corner */
+    .version-info {
+      position: absolute;
+      bottom: 5px;
+      left: 5px;
+      font-size: 0.7em;
+      color: rgba(255, 255, 255, 0.3);
+      z-index: 10;
+    }
   </style>
 </head>
 <body>
@@ -194,6 +204,11 @@
         <span class="word word-2">To</span>
         <span class="word word-3">Cars</span>
       </div>
+    </div>
+
+    <!-- Version info -->
+    <div class="version-info">
+      Version: {{ git_version }}
     </div>
 
     <!-- Buttons -->

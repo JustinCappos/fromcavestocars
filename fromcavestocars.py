@@ -33,6 +33,7 @@ prioritize 1 and 2 first.
 """
 
 import os
+import subprocess
 
 # This is read only for this program because we're just reading things in.
 # I will need to store user state (possibly), but it goes elsewhere.
@@ -347,6 +348,15 @@ def _get_user_id():
     else:
         return session['guest_id']
 
+
+def _get_git_version():
+    """Get the current git commit hash."""
+    try:
+        return subprocess.check_output(['git', 'rev-parse', 'HEAD'], 
+                                      stderr=subprocess.DEVNULL).strip().decode('utf-8')[:8]
+    except (subprocess.SubprocessError, FileNotFoundError):
+        return "unknown"
+
 @app.route("/")
 @app.route("/home")
 def home():
@@ -357,9 +367,14 @@ def home():
         userstatedict[uid]={}
         userstatedict[uid]['state'] = {}
 
+    # Get the git version
+    git_version = _get_git_version()
 
     # Generate the home page with links
-    return render_template("home.html", current_user = current_user, backurl=url_for("home"))
+    return render_template("home.html", 
+                          current_user=current_user, 
+                          backurl=url_for("home"),
+                          git_version=git_version)
 
 
 @app.route("/credits")
