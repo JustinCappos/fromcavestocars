@@ -31,6 +31,13 @@ ENV/
 # Cache files
 *.cache
 *.cache.json
+.data_copied
+testcache.json
+ic.*.json
+itemstomake.txt
+
+# Image files
+static/images/items/
 
 # IDE specific files
 .idea/
