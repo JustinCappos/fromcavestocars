@@ -119,17 +119,6 @@ class OpenAIQuery:
 
         # This doesn't seem to have any cost other than local parsing.  I'll 
         # recreate this per-request...
-        
-        # Check if we're in a test environment without API key
-        import os
-        if 'OPENAI_API_KEY' not in os.environ:
-            # For testing purposes, return a mock response when no API key is available
-            mock_response = "Eric Idle, Graham Chapman, John Cleese, Michael Palin, Terry Gilliam, and Terry Jones are the main actors in Monty Python's Quest For the Holy Grail."
-            if self.checkcache:
-                self.cache['raw'][querystring] = mock_response
-                self.save_cache()
-            return mock_response
-            
         client = openai.OpenAI()
 
         transmittedquery = optionalprefix + querystring
