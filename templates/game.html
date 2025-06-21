@@ -842,6 +842,9 @@
               if (arrowLink) {
                 arrowLink.remove();
               }
+              
+              // Check for completion after successful drop
+              checkAndHandleCompletion();
             } else {
               box.classList.add('shake');
               setTimeout(() => box.classList.remove('shake'), 500);
@@ -872,28 +875,27 @@
         });
       });
     </script>
-    <script>
-      document.querySelectorAll('.group-label').forEach(label => {
-        label.addEventListener('click', () => {
-          const group = label.closest('.group');
-          const boxes = group.querySelectorAll('.box');
 
-          const allCorrect = boxes.length === 0 || [...boxes].every(box =>
-            box.classList.contains('correct-drop') && box.children.length > 0
-          );
-
-          if (allCorrect) {
-            label.classList.add('completed');
-            group.classList.add('completed');
-          }
-        });
-      });
-    </script>
 
 
     <!-- Handles the "completed" overlay -->
 
     <script>
+      function checkGroupCompleted(group) {
+        const boxes = group.querySelectorAll('.box');
+        return boxes.length === 0 || [...boxes].every(box =>
+          box.classList.contains('correct-drop') && box.children.length > 0
+        );
+      }
+
+      function markGroupCompleted(group) {
+        const label = group.querySelector('.group-label');
+        if (label && !label.classList.contains('completed')) {
+          label.classList.add('completed');
+          group.classList.add('completed');
+        }
+      }
+
       function checkAllGroupsCompleted() {
         const groupLabels = document.querySelectorAll('.group-label');
         return Array.from(groupLabels).every(label => label.classList.contains('completed'));
@@ -905,11 +907,24 @@
         overlay.classList.add('show');
       }
 
+      function checkAndHandleCompletion() {
+        // Check each group for completion and mark as completed if all boxes are filled
+        const groups = document.querySelectorAll('.group');
+        groups.forEach(group => {
+          if (checkGroupCompleted(group)) {
+            markGroupCompleted(group);
+          }
+        });
+
+        // Check if all groups are completed and show overlay if so
+        if (checkAllGroupsCompleted()) {
+          showCompletionOverlay();
+        }
+      }
+
       document.querySelectorAll('.group-label').forEach(label => {
         label.addEventListener('click', () => {
-          if (checkAllGroupsCompleted()) {
-            showCompletionOverlay();
-          }
+          checkAndHandleCompletion();
         });
       });
     </script>
