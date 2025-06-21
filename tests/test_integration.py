@@ -157,5 +157,14 @@ class FromCavesToCarsIntegrationTests(unittest.TestCase):
             # Additional assertions about page content
             self.assertIn(b'Description of wood', response.data)
 
+    def test_credits_page(self):
+        """Test that the credits page loads and contains acknowledgment."""
+        response = self.app.get('/credits')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Credits', response.data)
+        self.assertIn(b'Amazon Lambda', response.data)
+        self.assertIn(b'Rajath Reghunath', response.data)
+        self.assertIn(b'invaluable help in getting the Amazon Lambda integration', response.data)
+
 if __name__ == '__main__':
     unittest.main()
