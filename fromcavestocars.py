@@ -853,6 +853,12 @@ def do_log(logmessage):
     LOGFILE.write(logmessage + "\n")
 
 
+@app.route('/favicon.ico')
+def favicon():
+    """Serve the favicon.ico file"""
+    return app.send_static_file('favicon.ico')
+
+
 ####### MAIN / ARGUMENT PARSING #######
 
 
