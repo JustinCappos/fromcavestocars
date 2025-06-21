@@ -67,5 +67,17 @@ class CompletionDetectionTests(unittest.TestCase):
         drop_success_pattern = r'result\.status === \'locked\'.*?correct-drop.*?checkAndHandleCompletion\(\);'
         self.assertTrue(re.search(drop_success_pattern, html_content, re.DOTALL))
 
+    def test_completion_check_called_on_page_load(self):
+        """Test that the completion check is called when the page loads."""
+        template_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'game.html')
+        
+        with open(template_path, 'r') as f:
+            html_content = f.read()
+            
+        # Verify that checkAndHandleCompletion is called at the end of the DOMContentLoaded handler
+        # This should be after all event listeners are set up but before the handler closes
+        page_load_pattern = r'addEventListener\(\'click\'.*?checkAndHandleCompletion\(\);.*?\}\);'
+        self.assertTrue(re.search(page_load_pattern, html_content, re.DOTALL))
+
 if __name__ == '__main__':
     unittest.main()

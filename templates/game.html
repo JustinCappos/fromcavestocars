@@ -873,6 +873,9 @@
             column1.classList.add('highlighted');
           });
         });
+
+        // Check for completion on page load (for items with no required actions)
+        checkAndHandleCompletion();
       });
     </script>
 
