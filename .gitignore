@@ -58,3 +58,8 @@ static/images/items/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Test files and temporary files
+cookies.txt
+test_cookies.txt
+*_test_cookies.txt

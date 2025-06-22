@@ -278,16 +278,21 @@ def register():
         username = request.form['username'].strip()
         password = request.form['password']
 
-        if User.query.filter_by(username=username).first():
-            error = "Username already taken."
-        else:
-            user = User(username=username)
-            user.set_password(password)
-            USERDB.session.add(user)
-            USERDB.session.commit()
-            # Log in the user
-            finalize_login(user)
-            return redirect(url_for('home'))
+        try:
+            if User.query.filter_by(username=username).first():
+                error = "Username already taken."
+            else:
+                user = User(username=username)
+                user.set_password(password)
+                USERDB.session.add(user)
+                USERDB.session.commit()
+                # Log in the user
+                finalize_login(user)
+                return redirect(url_for('home'))
+        except Exception as e:
+            # Log the database error for debugging
+            print(f"Database error during registration for user '{username}': {e}")
+            error = "Registration service temporarily unavailable. Please try again later."
 
     return render_template("register.html", error=error)
 
@@ -331,14 +336,19 @@ def login():
         username = request.form['username']
         password = request.form['password']
 
-        user = User.query.filter_by(username=username).first()
-        if user and user.check_password(password):
-            login_user(user)  # marks them as logged in in the session
-            next_page = request.args.get('next') or url_for('home')
-            finalize_login(user)
-            return redirect(next_page)
-        else:
-            return render_template('login.html', error="Invalid username or password.")
+        try:
+            user = User.query.filter_by(username=username).first()
+            if user and user.check_password(password):
+                login_user(user)  # marks them as logged in in the session
+                next_page = request.args.get('next') or url_for('home')
+                finalize_login(user)
+                return redirect(next_page)
+            else:
+                return render_template('login.html', error="Invalid username or password.")
+        except Exception as e:
+            # Log the database error for debugging
+            print(f"Database error during login for user '{username}': {e}")
+            return render_template('login.html', error="Login service temporarily unavailable. Please try again later.")
 
     return render_template('login.html')
 
@@ -683,14 +693,21 @@ def get_known_items():
 def _add_known_item_to_current_user(item):
     # This is a helper function to add a known item to the user.
     if item not in get_known_items():
-        # automatically converts current_user to the correct foreign key
-        if current_user.is_authenticated:
-            new_item = Item(name=item, user_id=current_user.id)
-        else:
-            new_item = Item(name=item, guest_id=session['guest_id'])
-        USERDB.session.add(new_item)
-        USERDB.session.commit()
-        return True
+        try:
+            # automatically converts current_user to the correct foreign key
+            if current_user.is_authenticated:
+                new_item = Item(name=item, user_id=current_user.id)
+            else:
+                new_item = Item(name=item, guest_id=session['guest_id'])
+            USERDB.session.add(new_item)
+            USERDB.session.commit()
+            return True
+        except Exception as e:
+            # Log the database error for debugging
+            print(f"Database error adding item '{item}' to user: {e}")
+            # Roll back the session to prevent corruption
+            USERDB.session.rollback()
+            return False
     return False
 
 def _get_image_boxes(availableitems,box_groups):
@@ -711,82 +728,88 @@ def _get_image_boxes(availableitems,box_groups):
 @app.route('/game')
 @login_required
 def game():
+    try:
+        init_stats_if_needed()
+        current_item = request.args.get('item_name', choice(list(POSSIBLEITEMSTATS.keys())), type=str)
 
-    init_stats_if_needed()
-    current_item = request.args.get('item_name', choice(list(POSSIBLEITEMSTATS.keys())), type=str)
+        uid = _get_user_id()
+        if uid not in userstatedict:
+            # Initialize user state
+            userstatedict[uid] = {}
+            userstatedict[uid]['state'] = {}
+        
+        if current_item not in userstatedict[uid]['state']:
+            # If the item is not in the user's state, add it
+            userstatedict[uid]['state'][current_item] = {}
 
+        exploration_path = request.args.get('exploration_path', current_item, type=str)
+        page_data = _get_page_data(current_item,exploration_path=exploration_path)
 
-    uid = _get_user_id()
-    if uid not in userstatedict:
-        # Initialize user state
-        userstatedict[uid] = {}
-        userstatedict[uid]['state'] = {}
-    
-    if current_item not in userstatedict[uid]['state']:
-        # If the item is not in the user's state, add it
-        userstatedict[uid]['state'][current_item] = {}
+        box_groups = page_data['box_groups']
+        boxes = page_data['boxes']
+        header_image_url = page_data['header_image_url']
+        header_title = page_data['header_title']
+        completion_image_url = page_data['completion_image_url']
+        page_description = page_data['page_description']
 
-    exploration_path = request.args.get('exploration_path', current_item, type=str)
-    page_data = _get_page_data(current_item,exploration_path=exploration_path)
+        base_items = page_data['base_items']
 
-    box_groups = page_data['box_groups']
-    boxes = page_data['boxes']
-    header_image_url = page_data['header_image_url']
-    header_title = page_data['header_title']
-    completion_image_url = page_data['completion_image_url']
-    page_description = page_data['page_description']
+        # TODO: Make this a splash page that comes up first...
 
-    base_items = page_data['base_items']
+        new_items = []
+        # If I didn't know this, add it.
+        for item in base_items:
+            if _add_known_item_to_current_user(item['name']):
+                new_items.append(item['name'])
 
-    # TODO: Make this a splash page that comes up first...
+        # If we just finished something, add it...
+        item_to_add = request.args.get('item_to_add', '', type=str)
+        if item_to_add != '':
+            if item_to_add in get_known_items():
+                # This is an error, because we already know this item.
+                print(f"Error: {item_to_add} already known.")
+            else:
+                _add_known_item_to_current_user(item_to_add)
 
-    new_items = []
-    # If I didn't know this, add it.
-    for item in base_items:
-        if _add_known_item_to_current_user(item['name']):
-            new_items.append(item['name'])
+        # Exploration path is a string of tags separated by slashes
+        header_tags = _get_header_tags(exploration_path)
 
-    # If we just finished something, add it...
-    item_to_add = request.args.get('item_to_add', '', type=str)
-    if item_to_add != '':
-        if item_to_add in get_known_items():
-            # This is an error, because we already know this item.
-            print(f"Error: {item_to_add} already known.")
+        # Build the 'completed / won URL!'
+        if len(header_tags) > 1:
+            parent_path = exploration_path.rsplit('/', 1)[0]
+            completion_url=url_for('game', item_name=header_tags[-2]['label'], exploration_path=parent_path, item_to_add=current_item)
         else:
-            _add_known_item_to_current_user(item_to_add)
+            completion_url=url_for('win', item_name=current_item)
 
-    # Exploration path is a string of tags separated by slashes
-    header_tags = _get_header_tags(exploration_path)
+        availableitems = get_known_items()
 
-    # Build the 'completed / won URL!'
-    if len(header_tags) > 1:
-        parent_path = exploration_path.rsplit('/', 1)[0]
-        completion_url=url_for('game', item_name=header_tags[-2]['label'], exploration_path=parent_path, item_to_add=current_item)
-    else:
-        completion_url=url_for('win', item_name=current_item)
+        imageboxes = _get_image_boxes(availableitems,box_groups)
+        
 
-    availableitems = get_known_items()
-
-    imageboxes = _get_image_boxes(availableitems,box_groups)
-    
-
-    return render_template(
-        'game.html',
-        header_image_url=header_image_url,
-        header_title=header_title,
-        header_tags=header_tags,
-        box_groups=box_groups,
-        completion_image_url=completion_image_url,
-        page_description=page_description,
-        item_name=current_item,
-        new_items=new_items,
-        exploration_path=exploration_path,
-        boxes=boxes, 
-        settings=session.get("settings", DEFAULT_SETTINGS.copy()),
-        box_fills=userstatedict[uid]['state'][current_item],
-        images=imageboxes,
-        completion_url=completion_url,
-    )
+        return render_template(
+            'game.html',
+            header_image_url=header_image_url,
+            header_title=header_title,
+            header_tags=header_tags,
+            box_groups=box_groups,
+            completion_image_url=completion_image_url,
+            page_description=page_description,
+            item_name=current_item,
+            new_items=new_items,
+            exploration_path=exploration_path,
+            boxes=boxes, 
+            settings=session.get("settings", DEFAULT_SETTINGS.copy()),
+            box_fills=userstatedict[uid]['state'][current_item],
+            images=imageboxes,
+            completion_url=completion_url,
+        )
+    except Exception as e:
+        # Log the error for debugging
+        print(f"Error in game route: {e}")
+        # Return a user-friendly error page
+        return render_template('error.html', 
+                             error_message="Game service temporarily unavailable. Please try again later.",
+                             error_details="There was an issue loading the game content."), 500
 
 @login_required
 @app.route('/drop', methods=['POST'])
@@ -959,21 +982,34 @@ def main(clouddeploy=False):
 
     # Initialize user database
     with app.app_context():
-        # Check database connectivity, especially important for production PostgreSQL
-        if not check_database_connection():
-            print("Warning: Database connection failed. Check your database configuration.")
-            if not app.config.get('TESTING'):
-                # In production, we should fail fast if database is not available
-                raise RuntimeError("Database connection failed. Cannot start application.")
-        
-        USERDB.create_all()
-        
         # Log database configuration for debugging
         db_uri = app.config['SQLALCHEMY_DATABASE_URI']
-        if 'postgresql' in db_uri:
-            print("Using PostgreSQL database for production")
-        else:
-            print("Using SQLite database for development/testing")
+        
+        # Check database connectivity, especially important for production PostgreSQL
+        if not check_database_connection():
+            print(f"Warning: Database connection failed for URI: {db_uri}")
+            print("Please check your database configuration and connectivity.")
+            
+            if 'postgresql' in db_uri:
+                print("Troubleshooting PostgreSQL connection:")
+                print("- Verify DB_USER, DB_PASSWORD, DB_NAME, and DB_CONNECTION_NAME environment variables")
+                print("- Check that the Cloud SQL instance is running and accessible")
+                print("- Ensure the database user has proper permissions")
+                
+            if not app.config.get('TESTING'):
+                # In production, we should fail fast if database is not available
+                raise RuntimeError(f"Database connection failed. Cannot start application. URI: {db_uri}")
+        
+        try:
+            USERDB.create_all()
+            if 'postgresql' in db_uri:
+                print("Successfully connected to PostgreSQL database for production")
+            else:
+                print("Using SQLite database for development/testing")
+        except Exception as e:
+            print(f"Error creating database tables: {e}")
+            if not app.config.get('TESTING'):
+                raise RuntimeError(f"Failed to create database tables: {e}")
 
     # Run the web server, if I'm not in the cloud.   Otherwise gunicorn runs as
     # my web server.
