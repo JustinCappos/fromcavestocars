@@ -42,6 +42,15 @@ ITEMDB = None
 POSSIBLEITEMSTATS = {}   # What the user could possibly make.   Only picks ones
                          # that are user requested.   Contains stats
 
+# Initialize ITEMDB if the file exists (for both production and test environments)
+if os.path.exists("itemdb.json"):
+    try:
+        ITEMDB = fctcdb.ItemDB("itemdb.json")
+        ITEMDB.prevent_infinite_recursion()
+    except Exception as e:
+        print(f"Warning: Failed to initialize ITEMDB: {e}")
+        ITEMDB = None
+
 def init_stats_if_needed():
 
     def _get_user_requested(item):
@@ -201,7 +210,7 @@ def initialize_database_config(use_fallback=False):
 ####### USER AUTHENTICATION #######
 
 # --- Database setup ---
-initialize_database_config(use_fallback=False)
+initialize_database_config(use_fallback=True)
 USERDB = SQLAlchemy(app)
 
 # --- Login manager ---
@@ -976,8 +985,9 @@ def main(clouddeploy=False):
 
     # This "database" is read only for this program.
     global ITEMDB
-    ITEMDB = fctcdb.ItemDB("itemdb.json")
-    ITEMDB.prevent_infinite_recursion()
+    if ITEMDB is None:
+        ITEMDB = fctcdb.ItemDB("itemdb.json")
+        ITEMDB.prevent_infinite_recursion()
 
     if clouddeploy:
         # Use defaults without argument parsing
