@@ -169,5 +169,20 @@ class FromCavesToCarsIntegrationTests(unittest.TestCase):
         self.assertIn(b'https://github.com/JustinCappos/fromcavestocars', response.data)
         self.assertIn(b'source code for this project is available on', response.data)
 
+    def test_authenticated_user_accessing_login_page(self):
+        """Test that an already authenticated user can access the login page without error."""
+        # Register and login a user first
+        self.register_test_user()
+        
+        # Now try to access the login page while authenticated
+        # This should not cause an internal server error
+        response = self.app.get('/login')
+        self.assertEqual(response.status_code, 302)  # Should redirect to home
+        
+        # Follow the redirect to ensure it goes to home
+        response = self.app.get('/login', follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Make a random item', response.data)  # Should be on home page
+
 if __name__ == '__main__':
     unittest.main()
