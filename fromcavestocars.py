@@ -717,6 +717,11 @@ def game():
 
 
     uid = _get_user_id()
+    if uid not in userstatedict:
+        # Initialize user state
+        userstatedict[uid] = {}
+        userstatedict[uid]['state'] = {}
+    
     if current_item not in userstatedict[uid]['state']:
         # If the item is not in the user's state, add it
         userstatedict[uid]['state'][current_item] = {}
@@ -795,6 +800,11 @@ def handle_drop():
     box_id = data.get('box_id')
 
     uid = _get_user_id()
+    
+    if uid not in userstatedict:
+        # Initialize user state
+        userstatedict[uid] = {}
+        userstatedict[uid]['state'] = {}
 
     # figure out enough to know if this is a valid box
     current_item = data.get('item_name')
