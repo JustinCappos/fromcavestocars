@@ -79,7 +79,6 @@ from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import LoginManager, login_user, current_user, logout_user, login_required, UserMixin
-from flask_dance.contrib.google import make_google_blueprint, google
 import secrets
 
 app = Flask(__name__)
@@ -181,16 +180,6 @@ def finalize_login(user):
 
 
 
-# --- OAuth (Google example) ---
-google_bp = make_google_blueprint(
-    client_id="GOOGLE_CLIENT_ID",
-    client_secret="GOOGLE_CLIENT_SECRET",
-    scope=["profile", "email"],
-    redirect_url="/oauth_callback"
-)
-app.register_blueprint(google_bp, url_prefix="/login")
-
-
 # wipes all guest items.  
 # TODO: If I was running a production service, I'd track the age of these
 # and clean them up every day or so
@@ -213,8 +202,6 @@ class User(UserMixin, USERDB.Model):
     guest_id = USERDB.Column(USERDB.String(36), nullable=True, index=True)
 
     password_hash = USERDB.Column(USERDB.String(128), nullable=True)
-    oauth_provider = USERDB.Column(USERDB.String(50), nullable=True)
-    oauth_id = USERDB.Column(USERDB.String(200), nullable=True)
 
     # one‐to‐many relationship: user.items will be a list of Item objects
     known_items = USERDB.relationship('Item', backref='user', lazy='dynamic')
@@ -301,44 +288,6 @@ def register():
 
     return render_template("register.html", error=error)
 
-
-
-@app.route("/oauth_callback")
-def oauth_callback():
-    try:
-        resp = google.get("/oauth2/v2/userinfo")
-        if not resp.ok:
-            flash("Failed to fetch user info from Google.", "error")
-            return redirect(url_for('register'))
-
-        info = resp.json()
-        oauth_id = info["id"]
-        provider = "google"
-        user = User.query.filter_by(oauth_provider=provider, oauth_id=oauth_id).first()
-
-        if not user:
-            # Create new user record without a local password
-            user = User(
-                username=info.get("name"),
-                oauth_provider=provider,
-                oauth_id=oauth_id
-            )
-            USERDB.session.add(user)
-            USERDB.session.commit()
-
-        # Log in the user
-        finalize_login(user)
-        return redirect(url_for('home'))
-    except Exception as e:
-        # Log the database error for debugging
-        print(f"Database error during OAuth callback: {e}")
-        # Rollback the session to prevent transaction issues
-        try:
-            USERDB.session.rollback()
-        except Exception as rollback_error:
-            print(f"Error during rollback: {rollback_error}")
-        flash("Authentication service temporarily unavailable. Please try again later.", "error")
-        return redirect(url_for('register'))
 
 
 # --- Login route ---
