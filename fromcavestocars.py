@@ -325,7 +325,6 @@ def oauth_callback():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
-        finalize_login(user)
         return redirect(url_for('home'))
 
     if request.method == 'POST':
