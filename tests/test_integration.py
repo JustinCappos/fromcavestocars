@@ -87,6 +87,9 @@ class FromCavesToCarsIntegrationTests(unittest.TestCase):
         self.assertIn(b'login', response.data.lower())
         self.assertIn(b'<input type="text" name="username"', response.data)
         self.assertIn(b'<input type="password" name="password"', response.data)
+        # Check that back button is present
+        self.assertIn(b'onclick="history.back()"', response.data)
+        self.assertIn(b'>Back<', response.data)
 
     def test_register_page(self):
         """Test that the registration page loads."""
@@ -95,6 +98,9 @@ class FromCavesToCarsIntegrationTests(unittest.TestCase):
         self.assertIn(b'Create Account', response.data)
         self.assertIn(b'<input type="text" name="username"', response.data)
         self.assertIn(b'<input type="password" name="password"', response.data)
+        # Check that back button is present
+        self.assertIn(b'onclick="history.back()"', response.data)
+        self.assertIn(b'>Back<', response.data)
 
     def test_registration_and_login_flow(self):
         """Test the user registration and login flow."""
