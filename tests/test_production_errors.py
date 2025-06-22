@@ -148,12 +148,6 @@ class ProductionErrorHandlingTests(unittest.TestCase):
             # The page should load successfully
             self.assertEqual(response.status_code, 200)
 
-    def test_oauth_callback_with_database_error(self):
-        """Test OAuth callback gracefully handles database errors."""
-        with app.app_context():
-            # Skip this test since OAuth requires complex Flask-Dance setup
-            self.skipTest("OAuth testing requires complex Flask-Dance mock setup")
-
 
 if __name__ == '__main__':
     unittest.main()
