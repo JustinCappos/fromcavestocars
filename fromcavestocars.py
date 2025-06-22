@@ -292,38 +292,53 @@ def register():
         except Exception as e:
             # Log the database error for debugging
             print(f"Database error during registration for user '{username}': {e}")
+            # Rollback the session to prevent transaction issues
+            try:
+                USERDB.session.rollback()
+            except Exception as rollback_error:
+                print(f"Error during rollback: {rollback_error}")
             error = "Registration service temporarily unavailable. Please try again later."
 
     return render_template("register.html", error=error)
 
 
 
-# --- OAuth callback ---
 @app.route("/oauth_callback")
 def oauth_callback():
-    resp = google.get("/oauth2/v2/userinfo")
-    if not resp.ok:
-        flash("Failed to fetch user info from Google.", "error")
+    try:
+        resp = google.get("/oauth2/v2/userinfo")
+        if not resp.ok:
+            flash("Failed to fetch user info from Google.", "error")
+            return redirect(url_for('register'))
+
+        info = resp.json()
+        oauth_id = info["id"]
+        provider = "google"
+        user = User.query.filter_by(oauth_provider=provider, oauth_id=oauth_id).first()
+
+        if not user:
+            # Create new user record without a local password
+            user = User(
+                username=info.get("name"),
+                oauth_provider=provider,
+                oauth_id=oauth_id
+            )
+            USERDB.session.add(user)
+            USERDB.session.commit()
+
+        # Log in the user
+        finalize_login(user)
+        return redirect(url_for('home'))
+    except Exception as e:
+        # Log the database error for debugging
+        print(f"Database error during OAuth callback: {e}")
+        # Rollback the session to prevent transaction issues
+        try:
+            USERDB.session.rollback()
+        except Exception as rollback_error:
+            print(f"Error during rollback: {rollback_error}")
+        flash("Authentication service temporarily unavailable. Please try again later.", "error")
         return redirect(url_for('register'))
-
-    info = resp.json()
-    oauth_id = info["id"]
-    provider = "google"
-    user = User.query.filter_by(oauth_provider=provider, oauth_id=oauth_id).first()
-
-    if not user:
-        # Create new user record without a local password
-        user = User(
-            username=info.get("name"),
-            oauth_provider=provider,
-            oauth_id=oauth_id
-        )
-        USERDB.session.add(user)
-        USERDB.session.commit()
-
-    # Log in the user
-    finalize_login(user)
-    return redirect(url_for('home'))
 
 
 # --- Login route ---
@@ -348,6 +363,11 @@ def login():
         except Exception as e:
             # Log the database error for debugging
             print(f"Database error during login for user '{username}': {e}")
+            # Rollback the session to prevent transaction issues
+            try:
+                USERDB.session.rollback()
+            except Exception as rollback_error:
+                print(f"Error during rollback: {rollback_error}")
             return render_template('login.html', error="Login service temporarily unavailable. Please try again later.")
 
     return render_template('login.html')
@@ -387,10 +407,7 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-@app.before_request
-def ensure_guest_id():
-    if 'guest_id' not in session:
-        session['guest_id'] = secrets.token_hex(16)
+# Removed duplicate @app.before_request decorator - guest ID handling is done above at line 366
 
 
 def _get_user_id():
@@ -986,7 +1003,8 @@ def main(clouddeploy=False):
         db_uri = app.config['SQLALCHEMY_DATABASE_URI']
         
         # Check database connectivity, especially important for production PostgreSQL
-        if not check_database_connection():
+        connection_success = check_database_connection()
+        if not connection_success:
             print(f"Warning: Database connection failed for URI: {db_uri}")
             print("Please check your database configuration and connectivity.")
             
@@ -996,9 +1014,12 @@ def main(clouddeploy=False):
                 print("- Check that the Cloud SQL instance is running and accessible")
                 print("- Ensure the database user has proper permissions")
                 
-            if not app.config.get('TESTING'):
-                # In production, we should fail fast if database is not available
+            if not app.config.get('TESTING') and not clouddeploy:
+                # In local development, we should fail fast if database is not available
                 raise RuntimeError(f"Database connection failed. Cannot start application. URI: {db_uri}")
+            elif clouddeploy:
+                # In cloud deployment, log the error but attempt to continue with fallback
+                print("Warning: Running with database connection issues in cloud deployment")
         
         try:
             USERDB.create_all()
@@ -1008,8 +1029,12 @@ def main(clouddeploy=False):
                 print("Using SQLite database for development/testing")
         except Exception as e:
             print(f"Error creating database tables: {e}")
-            if not app.config.get('TESTING'):
+            if not app.config.get('TESTING') and not clouddeploy:
                 raise RuntimeError(f"Failed to create database tables: {e}")
+            elif clouddeploy:
+                # In cloud deployment, log but try to continue
+                print(f"Warning: Failed to create database tables in cloud deployment: {e}")
+                print("Application may not function correctly without proper database setup")
 
     # Run the web server, if I'm not in the cloud.   Otherwise gunicorn runs as
     # my web server.
