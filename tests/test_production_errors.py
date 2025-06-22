@@ -101,9 +101,9 @@ class ProductionErrorHandlingTests(unittest.TestCase):
     def test_database_connection_check_failure(self):
         """Test that database connection check failures are handled gracefully."""
         with app.app_context():
-            # Mock the database engine to fail
-            with unittest.mock.patch.object(USERDB.engine, 'connect') as mock_connect:
-                mock_connect.side_effect = Exception("Connection failed")
+            # Mock the create_engine to fail
+            with unittest.mock.patch('sqlalchemy.create_engine') as mock_create_engine:
+                mock_create_engine.side_effect = Exception("Connection failed")
                 
                 # Check database connection
                 result = check_database_connection()

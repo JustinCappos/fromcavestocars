@@ -90,6 +90,43 @@ app.secret_key = os.getenv("SECRET_KEY", secrets.token_hex(32))
 
 ####### DATABASE CONFIGURATION #######
 
+def get_database_uri_with_fallback():
+    """
+    Get the appropriate database URI with fallback support.
+    Tests PostgreSQL connection and falls back to SQLite if it fails.
+    """
+    # Check if we're in testing mode
+    if app.config.get('TESTING'):
+        return 'sqlite:///:memory:'
+    
+    # Check for PostgreSQL environment variables
+    db_user = os.getenv('DB_USER')
+    db_password = os.getenv('DB_PASSWORD')
+    db_name = os.getenv('DB_NAME')
+    db_connection_name = os.getenv('DB_CONNECTION_NAME')
+    
+    if all([db_user, db_password, db_name, db_connection_name]):
+        # Try PostgreSQL first
+        postgresql_uri = f'postgresql+psycopg2://{db_user}:{db_password}@/{db_name}?host=/cloudsql/{db_connection_name}'
+        
+        # Test the PostgreSQL connection
+        try:
+            from sqlalchemy import create_engine, text
+            test_engine = create_engine(postgresql_uri)
+            with test_engine.connect() as conn:
+                conn.execute(text('SELECT 1'))
+            test_engine.dispose()
+            print("PostgreSQL connection test successful")
+            return postgresql_uri
+        except Exception as e:
+            print(f"PostgreSQL connection test failed: {e}")
+            print("Falling back to SQLite database")
+            return get_fallback_database_uri()
+    
+    # Default to SQLite for development
+    return 'sqlite:///fctc.db'
+
+
 def get_database_uri():
     """
     Get the appropriate database URI based on environment.
@@ -115,6 +152,16 @@ def get_database_uri():
     return 'sqlite:///fctc.db'
 
 
+def get_fallback_database_uri():
+    """
+    Get a fallback database URI for when the primary database connection fails.
+    Always returns SQLite URI unless in testing mode.
+    """
+    if app.config.get('TESTING'):
+        return 'sqlite:///:memory:'
+    return 'sqlite:///fctc_fallback.db'
+
+
 def check_database_connection():
     """
     Check database connectivity, particularly important for production PostgreSQL.
@@ -122,19 +169,39 @@ def check_database_connection():
     """
     try:
         # Test the connection by executing a simple query
-        with USERDB.engine.connect() as connection:
-            connection.execute(USERDB.text('SELECT 1'))
+        # Use the current database URI from config to create a test connection
+        from sqlalchemy import create_engine, text
+        current_uri = app.config['SQLALCHEMY_DATABASE_URI']
+        test_engine = create_engine(current_uri)
+        
+        with test_engine.connect() as connection:
+            connection.execute(text('SELECT 1'))
+        
+        test_engine.dispose()
         return True
     except Exception as e:
         print(f"Database connection failed: {e}")
         return False
 
 
+def initialize_database_config(use_fallback=False):
+    """
+    Initialize the database configuration, optionally with fallback support.
+    """
+    if use_fallback:
+        uri = get_database_uri_with_fallback()
+    else:
+        uri = get_database_uri()
+    
+    app.config['SQLALCHEMY_DATABASE_URI'] = uri
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    return uri
+
+
 ####### USER AUTHENTICATION #######
 
 # --- Database setup ---
-app.config['SQLALCHEMY_DATABASE_URI'] = get_database_uri()
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+initialize_database_config(use_fallback=False)
 USERDB = SQLAlchemy(app)
 
 # --- Login manager ---
@@ -966,9 +1033,8 @@ def main(clouddeploy=False):
             if not app.config.get('TESTING') and not clouddeploy:
                 # In local development, we should fail fast if database is not available
                 raise RuntimeError(f"Database connection failed. Cannot start application. URI: {db_uri}")
-            elif clouddeploy:
-                # In cloud deployment, log the error but attempt to continue with fallback
-                print("Warning: Running with database connection issues in cloud deployment")
+            elif not connection_success:
+                print("Warning: Running with database connection issues")
         
         try:
             USERDB.create_all()
@@ -978,9 +1044,30 @@ def main(clouddeploy=False):
                 print("Using SQLite database for development/testing")
         except Exception as e:
             print(f"Error creating database tables: {e}")
-            if not app.config.get('TESTING') and not clouddeploy:
+            
+            # If we're in cloud deployment and PostgreSQL failed, try creating a fallback SQLite database
+            if clouddeploy and 'postgresql' in db_uri:
+                print("Attempting to create fallback SQLite database...")
+                try:
+                    # Create a fallback SQLAlchemy instance with SQLite
+                    from sqlalchemy import create_engine
+                    from sqlalchemy.orm import sessionmaker
+                    
+                    fallback_uri = get_fallback_database_uri()
+                    fallback_engine = create_engine(fallback_uri)
+                    
+                    # Create tables using the fallback engine and our models
+                    USERDB.metadata.create_all(fallback_engine)
+                    fallback_engine.dispose()
+                    
+                    print(f"Successfully created fallback database: {fallback_uri}")
+                    print("Note: Application will continue with limited database functionality")
+                except Exception as fallback_error:
+                    print(f"Failed to create fallback database: {fallback_error}")
+                    print("Application may not function correctly without proper database setup")
+            elif not app.config.get('TESTING') and not clouddeploy:
                 raise RuntimeError(f"Failed to create database tables: {e}")
-            elif clouddeploy:
+            else:
                 # In cloud deployment, log but try to continue
                 print(f"Warning: Failed to create database tables in cloud deployment: {e}")
                 print("Application may not function correctly without proper database setup")
