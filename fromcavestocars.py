@@ -89,10 +89,52 @@ app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", secrets.token_hex(32))
 
 
+####### DATABASE CONFIGURATION #######
+
+def get_database_uri():
+    """
+    Get the appropriate database URI based on environment.
+    
+    Uses PostgreSQL for production when environment variables are present,
+    otherwise falls back to SQLite for development/testing.
+    """
+    # Check if we're in testing mode
+    if app.config.get('TESTING'):
+        return 'sqlite:///:memory:'
+    
+    # Check for PostgreSQL environment variables
+    db_user = os.getenv('DB_USER')
+    db_password = os.getenv('DB_PASSWORD')
+    db_name = os.getenv('DB_NAME')
+    db_connection_name = os.getenv('DB_CONNECTION_NAME')
+    
+    if all([db_user, db_password, db_name, db_connection_name]):
+        # Production PostgreSQL on Google Cloud SQL
+        return f'postgresql+psycopg2://{db_user}:{db_password}@/{db_name}?host=/cloudsql/{db_connection_name}'
+    
+    # Default to SQLite for development
+    return 'sqlite:///fctc.db'
+
+
+def check_database_connection():
+    """
+    Check database connectivity, particularly important for production PostgreSQL.
+    Returns True if connection is successful, False otherwise.
+    """
+    try:
+        # Test the connection by executing a simple query
+        with USERDB.engine.connect() as connection:
+            connection.execute(USERDB.text('SELECT 1'))
+        return True
+    except Exception as e:
+        print(f"Database connection failed: {e}")
+        return False
+
+
 ####### USER AUTHENTICATION #######
 
 # --- Database setup ---
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///fctc.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = get_database_uri()
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 USERDB = SQLAlchemy(app)
 
@@ -908,7 +950,21 @@ def main(clouddeploy=False):
 
     # Initialize user database
     with app.app_context():
+        # Check database connectivity, especially important for production PostgreSQL
+        if not check_database_connection():
+            print("Warning: Database connection failed. Check your database configuration.")
+            if not app.config.get('TESTING'):
+                # In production, we should fail fast if database is not available
+                raise RuntimeError("Database connection failed. Cannot start application.")
+        
         USERDB.create_all()
+        
+        # Log database configuration for debugging
+        db_uri = app.config['SQLALCHEMY_DATABASE_URI']
+        if 'postgresql' in db_uri:
+            print("Using PostgreSQL database for production")
+        else:
+            print("Using SQLite database for development/testing")
 
     # Run the web server, if I'm not in the cloud.   Otherwise gunicorn runs as
     # my web server.
