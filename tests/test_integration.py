@@ -165,6 +165,9 @@ class FromCavesToCarsIntegrationTests(unittest.TestCase):
         self.assertIn(b'Amazon Lambda', response.data)
         self.assertIn(b'Rajath Reghunath', response.data)
         self.assertIn(b'invaluable help in getting the Amazon Lambda integration', response.data)
+        # Verify GitHub repository link is present
+        self.assertIn(b'https://github.com/JustinCappos/fromcavestocars', response.data)
+        self.assertIn(b'source code for this project is available on', response.data)
 
 if __name__ == '__main__':
     unittest.main()
