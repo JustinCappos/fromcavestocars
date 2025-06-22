@@ -207,6 +207,21 @@ def initialize_database_config(use_fallback=False):
     return uri
 
 
+def get_database_type_indicator():
+    """
+    Get a single character indicator for the current database type.
+    Returns 'G' for global/cloud database (PostgreSQL) or 'L' for local database (SQLite).
+    """
+    database_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+    
+    if 'postgresql' in database_uri.lower():
+        return 'G'  # Global/cloud database
+    elif 'sqlite' in database_uri.lower():
+        return 'L'  # Local database
+    else:
+        return '?'  # Unknown database type
+
+
 ####### USER AUTHENTICATION #######
 
 # --- Database setup ---
@@ -412,6 +427,16 @@ import uuid
 def ensure_guest_id():
     if 'guest_id' not in session:
         session['guest_id'] = str(uuid.uuid4())
+
+
+@app.context_processor
+def inject_database_indicator():
+    """
+    Context processor to inject database type indicator into all templates.
+    """
+    return {
+        'database_indicator': get_database_type_indicator()
+    }
 
 
 ####### WEBSERVER #######
