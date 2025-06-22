@@ -40,21 +40,42 @@
       font-size: 1em;
     }
 
-    button {
-      width: 100%;
-      padding: 10px;
-      margin-top: 10px;
-      font-size: 1em;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
+    .button-row {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 20px;
     }
 
-    .btn-primary {
+    .button-row button,
+    .button-row a.button-link {
+      padding: 10px;
+      font-size: 1em;
+      border: none;
+      border-radius: 6px;
+      background: #007bff;
+      color: #fff;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.3s;
+    }
+    .button-row button:hover,
+    .button-row a.button-link:hover {
+      background: #0056b3;
+    }
+
+    .button-row .secondary {
+      background: #6c757d;
+    }
+    .button-row .secondary:hover {
+      background: #565e64;
+    }
+
+    .button-row .btn-primary {
       background: #007bff;
       color: #fff;
     }
-    .btn-primary:hover {
+    .button-row .btn-primary:hover {
       background: #0056b3;
     }
 
@@ -75,13 +96,12 @@
     <form method="POST" action="{{ url_for('register') }}">
       <input type="text" name="username" placeholder="Username" required>
       <input type="password" name="password" placeholder="Password" required>
-      <button type="submit" class="btn-primary">Register</button>
+      <div class="button-row">
+        <button type="submit" class="btn-primary">Register</button>
+        <a href="{{ url_for('login') }}" class="button-link secondary">Login</a>
+        <button type="button" class="secondary" onclick="history.back()">Back</button>
+      </div>
     </form>
-
-    <div class="button-row">
-      <button type="submit">Log In</button>
-      <a href="{{ url_for('login') }}" class="button-link secondary">Login</a>
-    </div>
   </div>
 </body>
 </html>
