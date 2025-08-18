@@ -180,6 +180,17 @@
       color: rgba(255, 255, 255, 0.3);
       z-index: 10;
     }
+
+    /* Disclaimer text in the bottom right corner */
+    .disclaimer {
+      position: absolute;
+      bottom: 5px;
+      right: 5px;
+      font-size: 0.7em;
+      color: rgba(255, 255, 255, 0.4);
+      z-index: 10;
+      font-style: italic;
+    }
   </style>
 </head>
 <body>
@@ -211,6 +222,11 @@
     <!-- Version info -->
     <div class="version-info">
       Version: {{ git_version }}
+    </div>
+
+    <!-- Disclaimer -->
+    <div class="disclaimer">
+      This is a toy site
     </div>
 
     <!-- Buttons -->
