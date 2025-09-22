@@ -933,28 +933,38 @@ def problem():
 
     if request.method == 'POST':
         # Process the form submission
-        selected_image = request.form['selected_image_id']
-        item_name = request.form['item_name']
+        selected_image = request.form.get('selected_image_id', '')
+        item_name = request.form.get('item_name', '')
+        step_name = request.form.get('step_name', '')
         desc_accurate = request.form['description_accurate']
         correct_item = request.form['correct_item']
-        good_image = request.form['good_image']
+        good_image = request.form.get('good_image', 'yes')  # Default for step names
         referrer = request.form['referrer']
 
-        # make this image the preferred one!
-        if selected_image != '' and selected_image != '0':
-            selected_image_no = int(selected_image)
-            goodimage = ITEMDB.items[item_name].image.pop(selected_image_no)
-            ITEMDB.items[item_name].image.insert(0,goodimage)
-            ITEMDB.save()
+        # Determine what we're evaluating
+        if step_name:
+            # Handle step name reporting
+            if desc_accurate == 'no':
+                do_log(f"STEP_DESC_INACCURATE: {step_name}")
+            if correct_item == 'no':
+                do_log(f"STEP_INACCURATE: {step_name}")
+        else:
+            # Handle item reporting (existing logic)
+            # make this image the preferred one!
+            if selected_image != '' and selected_image != '0':
+                selected_image_no = int(selected_image)
+                goodimage = ITEMDB.items[item_name].image.pop(selected_image_no)
+                ITEMDB.items[item_name].image.insert(0,goodimage)
+                ITEMDB.save()
 
-        if selected_image and selected_image != '0':
-            do_log(f"IMAGE_INACCURATE: {item_name}")
-        if desc_accurate == 'no':
-            do_log(f"DESC_INACCURATE: {item_name}")
-        if correct_item == 'no':
-            do_log(f"ITEM_INACCURATE: {item_name}")
-        if good_image == 'no':
-            do_log(f"ALL_IMAGES_INACCURATE: {item_name}")
+            if selected_image and selected_image != '0':
+                do_log(f"IMAGE_INACCURATE: {item_name}")
+            if desc_accurate == 'no':
+                do_log(f"DESC_INACCURATE: {item_name}")
+            if correct_item == 'no':
+                do_log(f"ITEM_INACCURATE: {item_name}")
+            if good_image == 'no':
+                do_log(f"ALL_IMAGES_INACCURATE: {item_name}")
 
         # Redirect to your desired URL
         return redirect(referrer)
@@ -962,20 +972,43 @@ def problem():
     # I think this will always be filled in as an arg.   If not, use the
     # request.referrer from Flask
     referrer = request.args.get('referrer', request.referrer, type=str)
-
+    
     item_name = request.args.get('item_name', '', type=str)
-    description = ITEMDB.items[item_name].description
+    step_name = request.args.get('step_name', '', type=str)
+    
+    if step_name:
+        # Handle step name evaluation
+        # Find the step description by searching through all items
+        description = "No description available."
+        for item_key, item in ITEMDB.items.items():
+            if hasattr(item, 'steps'):
+                for step in item.steps:
+                    if step['step'] == step_name:
+                        description = step.get('description', 'No description available.')
+                        break
+                if description != "No description available.":
+                    break
+        
+        return render_template("problem.html",
+                               step_name=step_name,
+                               description=description,
+                               images=[],  # No images for step names
+                               referrer=referrer,
+                               post_url=url_for('problem'))
+    else:
+        # Handle item evaluation (existing logic)
+        description = ITEMDB.items[item_name].description
 
-    imagelist = []
-    for count,image in enumerate(ITEMDB.items[item_name].image):
-        imagelist.append({'id': f"{count}", 'url': image['link']})
+        imagelist = []
+        for count,image in enumerate(ITEMDB.items[item_name].image):
+            imagelist.append({'id': f"{count}", 'url': image['link']})
 
-    return render_template("problem.html",
-                           item_name=item_name,
-                           description=description,
-                           images=imagelist,
-                           referrer=referrer,
-                           post_url=url_for('problem'))
+        return render_template("problem.html",
+                               item_name=item_name,
+                               description=description,
+                               images=imagelist,
+                               referrer=referrer,
+                               post_url=url_for('problem'))
 
 
 
