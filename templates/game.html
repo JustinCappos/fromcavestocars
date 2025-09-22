@@ -297,6 +297,17 @@
       margin-top: 5px;
     }
 
+    .group-label[draggable="true"] {
+      cursor: grab;
+      user-select: none;
+    }
+
+    .group-label[draggable="true"]:hover {
+      background-color: #e8f4fd;
+      border-radius: 4px;
+      padding: 2px 4px;
+    }
+
     .group-label.completed {
       color: white;
       background-color: green;
@@ -626,13 +637,13 @@
               {% endfor %}
             </div>
             <img src="static/images/curlybrace.png" class="group-image" alt="{{ group.label }}">
-            <div class="group-label" data-description="{{ group.description }}">
+            <div class="group-label" data-description="{{ group.description }}" data-step-name="{{ group.label }}" draggable="true">
               {{ group.label }}
             </div>
             {% else %}
             <div class="box-row-empty"></div>
             <div class="group-image-spacer"></div>
-            <div class="group-label" data-description="{{ group.description }}">
+            <div class="group-label" data-description="{{ group.description }}" data-step-name="{{ group.label }}" draggable="true">
               {{ group.label }}
             </div>
             {% endif %}
@@ -689,11 +700,17 @@
             problemDropBox.classList.remove('drop-hover');
 
             const data = e.dataTransfer.getData('text/plain');
+            const stepName = e.dataTransfer.getData('step-name');
             console.log('Dropped data:', data);
+            console.log('Dropped step name:', stepName);
             const dragged = document.querySelector(`[data-name="${data}"]`);
             console.log('Dropped:', dragged);
 
-            if (draggedName) {
+            if (stepName) {
+              // Redirect to problem page with step name
+              const currentUrl = window.location.href;
+              window.location.href = `/problem?step_name=${encodeURIComponent(stepName)}&referrer=${encodeURIComponent(currentUrl)}`;
+            } else if (draggedName) {
               // Redirect to problem page with itemName
               const currentUrl = window.location.href;
               window.location.href = `/problem?item_name=${encodeURIComponent(draggedName)}&referrer=${encodeURIComponent(currentUrl)}`;
@@ -766,6 +783,26 @@
           icon.addEventListener('dragend', () => {
             isDragging = false;
             column2.classList.remove('highlighted');
+          });
+        });
+
+        // Step name (group label) logic  
+        const stepLabels = document.querySelectorAll('.group-label[draggable="true"]');
+        stepLabels.forEach(label => {
+          label.addEventListener('dragstart', e => {
+            isDragging = true;
+            draggedName = label.dataset.stepName;
+            draggedSrc = null; // step names don't have images
+
+            column1.textContent = label.dataset.description || '';
+            column1.classList.add('highlighted');
+
+            e.dataTransfer.setData('step-name', draggedName);
+          });
+
+          label.addEventListener('dragend', () => {
+            isDragging = false;
+            column1.classList.remove('highlighted');
           });
         });
 

@@ -9,11 +9,12 @@
 <body>
   <div class="container">
     <header>
-      <h1>{{ item_name }}</h1>
+      <h1>{{ step_name or item_name }}</h1>
       <p class="description">{{ description }}</p>
     </header>
 
     <main>
+      {% if images %}
       <h2>Select the most appropriate image:</h2>
       <div class="image-grid">
         {% for img in images %}
@@ -22,10 +23,18 @@
         </div>
         {% endfor %}
       </div>
+      {% endif %}
 
       <form id="problem-form" method="POST" action="{{ post_url }}">
+        {% if images %}
         <input type="hidden" name="selected_image_id" id="selected-image-id">
+        {% endif %}
+        {% if item_name %}
         <input type="hidden" name="item_name" value="{{ item_name }}">
+        {% endif %}
+        {% if step_name %}
+        <input type="hidden" name="step_name" value="{{ step_name }}">
+        {% endif %}
         <input type="hidden" name="referrer" value="{{ referrer }}">
 
 	<div class="radios">
@@ -39,7 +48,7 @@
 	<label for="desc-no">No</label>
 	</div>
 
-	<label>Is this the correct item?</label>
+	<label>Is this the correct {{ 'step' if step_name else 'item' }}?</label>
 	<div class="toggle">
 	<input type="radio" id="item-yes" name="correct_item" value="yes" checked>
 	<label for="item-yes">Yes</label>
@@ -48,6 +57,7 @@
 	<label for="item-no">No</label>
 	</div>
 
+	{% if images %}
 	<label>Are any of the images accurate?</label>
 	<div class="toggle">
 	<input type="radio" id="images-yes" name="good_image" value="yes" checked>
@@ -56,6 +66,7 @@
 	<input type="radio" id="images-no" name="good_image" value="no">
 	<label for="images-no">No</label>
 	</div>
+	{% endif %}
 
 	</div>
 
