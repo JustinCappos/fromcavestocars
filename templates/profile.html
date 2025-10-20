@@ -144,6 +144,24 @@
         </div>
       </div>
 
+      <div class="toggle-group">
+        <label class="group-label">Pronoun preference in narratives</label>
+        <div class="toggle">
+          <input type="radio" id="pronoun-neutral" name="pronoun_preference" value="neutral"
+                 {% if settings.pronoun_preference == 'neutral' %}checked{% endif %}>
+          <label for="pronoun-neutral">Neutral</label>
+          <input type="radio" id="pronoun-he" name="pronoun_preference" value="he"
+                 {% if settings.pronoun_preference == 'he' %}checked{% endif %}>
+          <label for="pronoun-he">He/Him</label>
+          <input type="radio" id="pronoun-she" name="pronoun_preference" value="she"
+                 {% if settings.pronoun_preference == 'she' %}checked{% endif %}>
+          <label for="pronoun-she">She/Her</label>
+          <input type="radio" id="pronoun-they" name="pronoun_preference" value="they"
+                 {% if settings.pronoun_preference == 'they' %}checked{% endif %}>
+          <label for="pronoun-they">They/Them</label>
+        </div>
+      </div>
+
       <div class="button-row">
         <button type="submit">Save Settings</button>
         <button type="button" class="danger"
