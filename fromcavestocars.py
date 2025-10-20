@@ -559,13 +559,112 @@ def suggestion():
     return jsonify(success=True)
 
 
+import re
+
+def apply_pronoun_preference(text, pronoun_preference):
+    """
+    Replace pronouns in text based on user's pronoun preference.
+    
+    Args:
+        text: The text to process
+        pronoun_preference: One of "neutral", "he", "she", "they"
+    
+    Returns:
+        Text with pronouns replaced according to preference
+    """
+    if not text or pronoun_preference == "neutral":
+        return text
+    
+    # Define pronoun mappings for different preferences
+    # Maps (pattern, case_sensitive) -> replacement
+    pronoun_maps = {
+        "he": [
+            # Subject pronouns
+            (r'\bthey\b', False, 'he'),
+            (r'\bThey\b', True, 'He'),
+            (r'\bshe\b', False, 'he'),
+            (r'\bShe\b', True, 'He'),
+            # Object pronouns
+            (r'\bthem\b', False, 'him'),
+            (r'\bThem\b', True, 'Him'),
+            (r'\bher\b', False, 'him'),
+            (r'\bHer\b', True, 'Him'),
+            # Possessive pronouns
+            (r'\btheir\b', False, 'his'),
+            (r'\bTheir\b', True, 'His'),
+            (r'\btheirs\b', False, 'his'),
+            (r'\bTheirs\b', True, 'His'),
+            # Reflexive pronouns
+            (r'\bthemselves\b', False, 'himself'),
+            (r'\bThemselves\b', True, 'Himself'),
+            (r'\bherself\b', False, 'himself'),
+            (r'\bHerself\b', True, 'Himself'),
+        ],
+        "she": [
+            # Subject pronouns
+            (r'\bthey\b', False, 'she'),
+            (r'\bThey\b', True, 'She'),
+            (r'\bhe\b', False, 'she'),
+            (r'\bHe\b', True, 'She'),
+            # Object pronouns
+            (r'\bthem\b', False, 'her'),
+            (r'\bThem\b', True, 'Her'),
+            (r'\bhim\b', False, 'her'),
+            (r'\bHim\b', True, 'Her'),
+            # Possessive pronouns
+            (r'\btheir\b', False, 'her'),
+            (r'\bTheir\b', True, 'Her'),
+            (r'\btheirs\b', False, 'hers'),
+            (r'\bTheirs\b', True, 'Hers'),
+            (r'\bhis\b', False, 'her'),
+            (r'\bHis\b', True, 'Her'),
+            # Reflexive pronouns
+            (r'\bthemselves\b', False, 'herself'),
+            (r'\bThemselves\b', True, 'Herself'),
+            (r'\bhimself\b', False, 'herself'),
+            (r'\bHimself\b', True, 'Herself'),
+        ],
+        "they": [
+            # Subject pronouns
+            (r'\bhe\b', False, 'they'),
+            (r'\bHe\b', True, 'They'),
+            (r'\bshe\b', False, 'they'),
+            (r'\bShe\b', True, 'They'),
+            # Object pronouns
+            (r'\bhim\b', False, 'them'),
+            (r'\bHim\b', True, 'Them'),
+            (r'\bher\b', False, 'them'),
+            (r'\bHer\b', True, 'Them'),
+            # Possessive pronouns
+            (r'\bhis\b', False, 'their'),
+            (r'\bHis\b', True, 'Their'),
+            (r'\bhers\b', False, 'theirs'),
+            (r'\bHers\b', True, 'Theirs'),
+            # Reflexive pronouns
+            (r'\bhimself\b', False, 'themselves'),
+            (r'\bHimself\b', True, 'Themselves'),
+            (r'\bherself\b', False, 'themselves'),
+            (r'\bHerself\b', True, 'Themselves'),
+        ]
+    }
+    
+    # Apply the appropriate pronoun map
+    if pronoun_preference in pronoun_maps:
+        for pattern, case_sensitive, replacement in pronoun_maps[pronoun_preference]:
+            if case_sensitive:
+                text = re.sub(pattern, replacement, text)
+            else:
+                text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+    
+    return text
 
 
 # Dummy default user settings
 DEFAULT_SETTINGS = {
     "only_useful": True,
     "skip_intro": False,
-    "skip_make_text": False
+    "skip_make_text": False,
+    "pronoun_preference": "neutral"  # Options: "neutral", "he", "she", "they"
 }
 
 @app.route("/profile", methods=["GET", "POST"])
@@ -581,11 +680,13 @@ def profile():
         only_useful = request.form.get("only_useful") == "yes"
         skip_intro  = request.form.get("skip_intro")  == "yes"
         skip_make_text  = request.form.get("skip_make_text")  == "yes"
+        pronoun_preference = request.form.get("pronoun_preference", "neutral")
         # Store in session or database; here we use session for simplicity
         session["settings"] = {
             "only_useful": only_useful,
             "skip_intro": skip_intro,
-            "skip_make_text": skip_make_text
+            "skip_make_text": skip_make_text,
+            "pronoun_preference": pronoun_preference
         }
         return redirect(url_for("profile", back_url=back_url))
 
@@ -630,7 +731,7 @@ def _get_box(boxid, item, shape,exploration_path=None):
     return thisbox
 
 
-def _step_to_box_groups(steps,exploration_path=None):
+def _step_to_box_groups(steps,exploration_path=None,pronoun_preference="neutral"):
     """
     Convert steps to box groups.
     """
@@ -639,7 +740,7 @@ def _step_to_box_groups(steps,exploration_path=None):
     for step in steps:
         thisbg = {}
         thisbg['label'] = step['step']
-        thisbg['description'] = step['description']
+        thisbg['description'] = apply_pronoun_preference(step['description'], pronoun_preference)
         thisbg['boxes'] = []
         for item in step['raw_materials']:
             thisbg['boxes'].append(_get_box(boxid, item, 'oval',exploration_path=exploration_path))
@@ -653,10 +754,10 @@ def _step_to_box_groups(steps,exploration_path=None):
 
     return box_groups
         
-def _get_item(item,shape):
-    return {'name':item,'url':ITEMDB.items[item].image[0]['link'],'shape':shape,'description':ITEMDB.items[item].description} 
+def _get_item(item,shape,pronoun_preference="neutral"):
+    return {'name':item,'url':ITEMDB.items[item].image[0]['link'],'shape':shape,'description':apply_pronoun_preference(ITEMDB.items[item].description, pronoun_preference)} 
 
-def _get_base_items(box_groups):
+def _get_base_items(box_groups,pronoun_preference="neutral"):
     """
     Get the base items from the box groups.
     """
@@ -664,18 +765,18 @@ def _get_base_items(box_groups):
     for bg in box_groups:
         for box in bg['boxes']:
             if not 'arrow_url' in box:
-                thisitem = _get_item(box['accepts'],box['shape'])
+                thisitem = _get_item(box['accepts'],box['shape'],pronoun_preference)
                 if thisitem not in base_items:
                     base_items.append(thisitem)
     return base_items
 
-def _get_page_data(current_item,exploration_path=None):
+def _get_page_data(current_item,exploration_path=None,pronoun_preference="neutral"):
     """
     Get the page data for the current item number.
     """
 
     header_title = ITEMDB.items[current_item].name
-    box_groups = _step_to_box_groups(ITEMDB.items[current_item].steps,exploration_path=exploration_path)
+    box_groups = _step_to_box_groups(ITEMDB.items[current_item].steps,exploration_path=exploration_path,pronoun_preference=pronoun_preference)
 
     boxes = []
     for bg in box_groups:
@@ -692,11 +793,11 @@ def _get_page_data(current_item,exploration_path=None):
 
     # get the description, if it exists.
     if hasattr(ITEMDB.items[current_item],'description'):
-        page_description = ITEMDB.items[current_item].description
+        page_description = apply_pronoun_preference(ITEMDB.items[current_item].description, pronoun_preference)
     else:
         page_description = "No description available."
 
-    base_items = _get_base_items(box_groups)
+    base_items = _get_base_items(box_groups,pronoun_preference)
     
     return {
             'header_title':header_title,
@@ -777,7 +878,7 @@ def _add_known_item_to_current_user(item):
             return False
     return False
 
-def _get_image_boxes(availableitems,box_groups):
+def _get_image_boxes(availableitems,box_groups,pronoun_preference="neutral"):
     """
     Get the image boxes for the current item number.
     """
@@ -787,7 +888,7 @@ def _get_image_boxes(availableitems,box_groups):
         for box in bg['boxes']:
             if box['accepts'] in unseenitems:
                 unseenitems.remove(box['accepts'])
-                imageboxes.append(_get_item(box['accepts'],box['shape']))
+                imageboxes.append(_get_item(box['accepts'],box['shape'],pronoun_preference))
 
     return imageboxes
 
@@ -810,7 +911,12 @@ def game():
             userstatedict[uid]['state'][current_item] = {}
 
         exploration_path = request.args.get('exploration_path', current_item, type=str)
-        page_data = _get_page_data(current_item,exploration_path=exploration_path)
+        
+        # Get user's pronoun preference from settings
+        settings = session.get("settings", DEFAULT_SETTINGS.copy())
+        pronoun_preference = settings.get("pronoun_preference", "neutral")
+        
+        page_data = _get_page_data(current_item,exploration_path=exploration_path,pronoun_preference=pronoun_preference)
 
         box_groups = page_data['box_groups']
         boxes = page_data['boxes']
@@ -850,7 +956,7 @@ def game():
 
         availableitems = get_known_items()
 
-        imageboxes = _get_image_boxes(availableitems,box_groups)
+        imageboxes = _get_image_boxes(availableitems,box_groups,pronoun_preference)
         
 
         return render_template(
